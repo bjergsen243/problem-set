@@ -1,0 +1,41 @@
+name: Test and Deploy
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.yarnpkg.com'
+
+      - name: Install dependencies
+        run: |
+          cp .env.example .env      
+          yarn install
+
+      - name: Run checks
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+        run: yarn check
+
+      - name: Run tests
+        run: yarn test
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./coverage/
+          fail_ci_if_error: true

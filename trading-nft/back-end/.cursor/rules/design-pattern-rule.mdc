@@ -1,0 +1,187 @@
+---
+description: CRQS Pattern
+globs: 
+alwaysApply: false
+---
+# CQRS Pattern Rules
+
+## Overview
+This project follows the CQRS (Command Query Responsibility Segregation) pattern. The pattern separates read and write operations into different models.
+
+## Core Principles
+
+### 1. Command-Query Separation
+- Commands: Modify state, should not return data
+- Queries: Return data, should not modify state
+- Each operation should be either a Command or a Query, never both
+
+### 2. Directory Structure
+```
+src/modules/{module-name}/
+├── commands/                    # Command handlers and command DTOs
+│   ├── handlers/               # Command handlers implementation
+│   ├── impl/                   # Command implementations
+│   └── dtos/                   # Command DTOs
+├── queries/                    # Query handlers and query DTOs
+│   ├── handlers/               # Query handlers implementation
+│   ├── impl/                   # Query implementations
+│   └── dtos/                   # Query DTOs
+├── events/                     # Domain events
+│   ├── handlers/               # Event handlers
+│   └── impl/                   # Event implementations
+└── infrastructure/             # Infrastructure layer
+    ├── repositories/           # Repository implementations
+    └── entities/               # Database entities
+```
+
+### 3. Command Rules
+- Commands represent intent to change the system state
+- Command names should be in imperative form (e.g., CreatePaymentAccount, SendPayment)
+- Commands should have a single handler
+- Command handlers should not return domain data
+- Example structure:
+```typescript
+// Command
+export class CreatePaymentAccountCommand {
+  constructor(
+    public readonly userId: string,
+    public readonly accountName: string,
+    public readonly currency: string
+  ) {}
+}
+
+// Command Handler
+@CommandHandler(CreatePaymentAccountCommand)
+export class CreatePaymentAccountHandler {
+  async execute(command: CreatePaymentAccountCommand): Promise<void> {
+    // Implementation
+  }
+}
+```
+
+### 4. Query Rules
+- Queries represent intent to retrieve data
+- Query names should be in interrogative form (e.g., GetPaymentAccounts, GetTransactions)
+- Queries can have multiple handlers
+- Query handlers should be optimized for reading
+- Example structure:
+```typescript
+// Query
+export class GetPaymentAccountsQuery {
+  constructor(
+    public readonly userId: string,
+    public readonly filters: GetAccountsFilter,
+    public readonly pagination: IPagination
+  ) {}
+}
+
+// Query Handler
+@QueryHandler(GetPaymentAccountsQuery)
+export class GetPaymentAccountsHandler {
+  async execute(query: GetPaymentAccountsQuery): Promise<PaymentAccountResponseDto[]> {
+    // Implementation
+  }
+}
+```
+
+### 5. Event Rules
+- Events represent something that has happened
+- Events should be in past tense (e.g., PaymentAccountCreated, PaymentSent)
+- Events can have multiple handlers
+- Example structure:
+```typescript
+// Event
+export class PaymentAccountCreatedEvent {
+  constructor(
+    public readonly accountId: string,
+    public readonly userId: string,
+    public readonly timestamp: Date
+  ) {}
+}
+
+// Event Handler
+@EventsHandler(PaymentAccountCreatedEvent)
+export class PaymentAccountCreatedHandler {
+  async handle(event: PaymentAccountCreatedEvent): Promise<void> {
+    // Implementation
+  }
+}
+```
+
+### 6. Controller Rules
+- Controllers should be thin
+- Split into CommandController and QueryController
+- Use @CommandBus and @QueryBus for dispatching
+- Example:
+```typescript
+@Controller('payment/commands')
+export class PaymentCommandController {
+  constructor(private readonly commandBus: CommandBus) {}
+
+  @Post('/create-account')
+  async createAccount(@Body() dto: CreatePaymentAccountDto) {
+    return this.commandBus.execute(
+      new CreatePaymentAccountCommand(dto)
+    );
+  }
+}
+
+@Controller('payment/queries')
+export class PaymentQueryController {
+  constructor(private readonly queryBus: QueryBus) {}
+
+  @Get('/accounts')
+  async getAccounts(@Query() filters: GetAccountsFilter) {
+    return this.queryBus.execute(
+      new GetPaymentAccountsQuery(filters)
+    );
+  }
+}
+```
+
+### 7. Response Handling
+- Commands should return void or operation status
+- Queries should return DTOs
+- Use separate read and write models
+- Example:
+```typescript
+// Write Model
+export class PaymentAccount {
+  // Domain model with business logic
+}
+
+// Read Model
+export class PaymentAccountReadModel {
+  // Simplified model for queries
+}
+```
+
+### 8. Testing Rules
+- Test commands and queries separately
+- Mock the command/query bus in controller tests
+- Use in-memory repositories for handler tests
+- Example:
+```typescript
+describe('CreatePaymentAccountHandler', () => {
+  it('should create payment account', async () => {
+    const command = new CreatePaymentAccountCommand(...);
+    await handler.execute(command);
+    // Assert state changes
+  });
+});
+```
+
+## Implementation Example for Payment Module
+
+Current operations should be split as follows:
+
+Commands:
+- CreatePaymentAccount
+- SendPayment
+- WithdrawPayment
+
+Queries:
+- GetMyAccounts
+- GetMyTransactions
+
+Each operation should follow the CQRS pattern as described above.
